@@ -65,65 +65,48 @@ const verifyEmail = async (email) => {
   return smtpStatus;
 };
 
-app.post('/upload', upload.single('file'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No file uploaded' });
-  }
+app.post('/upload', upload.single('file'), async (req, res) => {
+  try {
+    const filePath = req.file.path;
+    const emailColumn = req.body.emailColumn;
+    const originalFileName = path.parse(req.file.originalname).name;
 
-  const validResults = [];
-  const invalidResults = [];
-  const catchAllResults = [];
-  const filePath = req.file.path;
-  const emailColumn = req.body.emailColumn; // Get the email column from the request
-  const originalFileName = path.parse(req.file.originalname).name; // Get the original filename without extension
+    if (!filePath || !emailColumn) {
+      return res.status(400).json({ status: 'error', message: 'File or email column is missing' });
+    }
 
-  const processCsv = async () => {
-    const dataPromises = [];
+    const validResults = [];
+    const invalidResults = [];
+    const catchAllResults = [];
 
     fs.createReadStream(filePath)
       .pipe(csv())
-      .on('data', (data) => {
-        dataPromises.push(new Promise(async (resolve) => {
-          const email = data[emailColumn]; // Use the dynamic column name
-          if (email) {
-            try {
-              const status = await verifyEmail(email);
-              const resultData = { ...data, status }; // Ensure status is written correctly
-              if (status === 'valid') {
-                validResults.push(resultData);
-              } else if (status === 'invalid') {
-                invalidResults.push(resultData);
-              } else {
-                catchAllResults.push(resultData);
-              }
-            } catch (error) {
-              console.error('Error verifying email:', error);
-              invalidResults.push({ ...data, status: 'invalid' }); // Ensure status is written correctly
-            }
-          } else {
-            invalidResults.push({ ...data, status: 'invalid' }); // Ensure status is written correctly
+      .on('data', async (data) => {
+        const email = data[emailColumn];
+        if (email) {
+          try {
+            const status = await verifyEmail(email);
+            const resultData = { ...data, status };
+            if (status === 'valid') validResults.push(resultData);
+            else if (status === 'invalid') invalidResults.push(resultData);
+            else catchAllResults.push(resultData);
+          } catch (error) {
+            invalidResults.push({ ...data, status: 'invalid' });
           }
-          resolve();
-        }));
+        } else {
+          invalidResults.push({ ...data, status: 'invalid' });
+        }
       })
-      .on('end', async () => {
-        await Promise.all(dataPromises);
-
-        const validCount = validResults.length;
-        const invalidCount = invalidResults.length;
-        const catchAllCount = catchAllResults.length;
-
-        const validOutputPath = path.join(uploadsDir, `${originalFileName}-valid.csv`);
-        const invalidOutputPath = path.join(uploadsDir, `${originalFileName}-invalid.csv`);
-        const catchAllOutputPath = path.join(uploadsDir, `${originalFileName}-catchall.csv`);
+      .on('end', () => {
+        const validOutputPath = path.join(__dirname, 'uploads', `${originalFileName}-valid.csv`);
+        const invalidOutputPath = path.join(__dirname, 'uploads', `${originalFileName}-invalid.csv`);
+        const catchAllOutputPath = path.join(__dirname, 'uploads', `${originalFileName}-catchall.csv`);
 
         const writeCsvFile = (outputPath, results) => {
           if (results.length > 0) {
             const writeStream = fs.createWriteStream(outputPath);
             writeStream.write(Object.keys(results[0]).join(',') + '\n');
-            results.forEach((result) => {
-              writeStream.write(Object.values(result).join(',') + '\n');
-            });
+            results.forEach((result) => writeStream.write(Object.values(result).join(',') + '\n'));
             writeStream.end();
           }
         };
@@ -136,12 +119,10 @@ app.post('/upload', upload.single('file'), (req, res) => {
         const invalidDownloadUrl = `https://risheshg-llv-backend-production.up.railway.app/download/${originalFileName}-invalid.csv`;
         const catchAllDownloadUrl = `https://risheshg-llv-backend-production.up.railway.app/download/${originalFileName}-catchall.csv`;
 
-        console.log('Download URLs:', { validDownloadUrl, invalidDownloadUrl, catchAllDownloadUrl });
-
         res.json({
-          validCount,
-          invalidCount,
-          catchAllCount,
+          validCount: validResults.length,
+          invalidCount: invalidResults.length,
+          catchAllCount: catchAllResults.length,
           validUrl: validDownloadUrl,
           invalidUrl: invalidDownloadUrl,
           catchAllUrl: catchAllDownloadUrl,
@@ -151,12 +132,14 @@ app.post('/upload', upload.single('file'), (req, res) => {
       })
       .on('error', (err) => {
         console.error('Error processing CSV file:', err);
-        res.status(500).json({ error: 'Error processing CSV file' });
+        res.status(500).json({ status: 'error', message: 'Error processing CSV file' });
       });
-  };
-
-  processCsv();
+  } catch (error) {
+    console.error('Error handling upload request:', error);
+    res.status(500).json({ status: 'error', message: 'Server error' });
+  }
 });
+
 
 // Static file serving for downloads
 app.use('/download', express.static(uploadsDir));
