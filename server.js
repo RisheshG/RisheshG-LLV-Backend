@@ -121,9 +121,9 @@ app.post('/upload', upload.single('file'), (req, res) => {
         writeCsvFile(invalidOutputPath, invalidResults);
         writeCsvFile(catchAllOutputPath, catchAllResults);
 
-        const validDownloadUrl = `https://llv-backend-production.up.railway.app/download/${originalFileName}-valid.csv`;
-        const invalidDownloadUrl = `https://llv-backend-production.up.railway.app/download/${originalFileName}-invalid.csv`;
-        const catchAllDownloadUrl = `https://llv-backend-production.up.railway.app/download/${originalFileName}-catchall.csv`;
+        const validDownloadUrl = `https://risheshg-llv-backend-production.up.railway.app/${originalFileName}-valid.csv`;
+        const invalidDownloadUrl = `https://risheshg-llv-backend-production.up.railway.app/${originalFileName}-invalid.csv`;
+        const catchAllDownloadUrl = `https:/risheshg-llv-backend-production.up.railway.app/${originalFileName}-catchall.csv`;
 
         console.log('Download URLs:', { validDownloadUrl, invalidDownloadUrl, catchAllDownloadUrl });
 
