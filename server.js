@@ -13,6 +13,12 @@ app.use(express.urlencoded({ extended: true }));
 
 const upload = multer({ dest: 'uploads/' });
 
+// Ensure the uploads directory exists
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir);
+}
+
 // Validate email syntax
 const validateEmailSyntax = (email) => {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -60,6 +66,10 @@ const verifyEmail = async (email) => {
 };
 
 app.post('/upload', upload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+
   const validResults = [];
   const invalidResults = [];
   const catchAllResults = [];
@@ -87,6 +97,7 @@ app.post('/upload', upload.single('file'), (req, res) => {
                 catchAllResults.push(resultData);
               }
             } catch (error) {
+              console.error('Error verifying email:', error);
               invalidResults.push({ ...data, status: 'invalid' }); // Ensure status is written correctly
             }
           } else {
@@ -102,9 +113,9 @@ app.post('/upload', upload.single('file'), (req, res) => {
         const invalidCount = invalidResults.length;
         const catchAllCount = catchAllResults.length;
 
-        const validOutputPath = path.join(__dirname, 'uploads', `${originalFileName}-valid.csv`);
-        const invalidOutputPath = path.join(__dirname, 'uploads', `${originalFileName}-invalid.csv`);
-        const catchAllOutputPath = path.join(__dirname, 'uploads', `${originalFileName}-catchall.csv`);
+        const validOutputPath = path.join(uploadsDir, `${originalFileName}-valid.csv`);
+        const invalidOutputPath = path.join(uploadsDir, `${originalFileName}-invalid.csv`);
+        const catchAllOutputPath = path.join(uploadsDir, `${originalFileName}-catchall.csv`);
 
         const writeCsvFile = (outputPath, results) => {
           if (results.length > 0) {
@@ -121,9 +132,9 @@ app.post('/upload', upload.single('file'), (req, res) => {
         writeCsvFile(invalidOutputPath, invalidResults);
         writeCsvFile(catchAllOutputPath, catchAllResults);
 
-        const validDownloadUrl = `https://risheshg-llv-backend-production.up.railway.app/${originalFileName}-valid.csv`;
-        const invalidDownloadUrl = `https://risheshg-llv-backend-production.up.railway.app/${originalFileName}-invalid.csv`;
-        const catchAllDownloadUrl = `https:/risheshg-llv-backend-production.up.railway.app/${originalFileName}-catchall.csv`;
+        const validDownloadUrl = `https://risheshg-llv-backend-production.up.railway.app/download/${originalFileName}-valid.csv`;
+        const invalidDownloadUrl = `https://risheshg-llv-backend-production.up.railway.app/download/${originalFileName}-invalid.csv`;
+        const catchAllDownloadUrl = `https://risheshg-llv-backend-production.up.railway.app/download/${originalFileName}-catchall.csv`;
 
         console.log('Download URLs:', { validDownloadUrl, invalidDownloadUrl, catchAllDownloadUrl });
 
@@ -139,6 +150,7 @@ app.post('/upload', upload.single('file'), (req, res) => {
         fs.unlinkSync(filePath);
       })
       .on('error', (err) => {
+        console.error('Error processing CSV file:', err);
         res.status(500).json({ error: 'Error processing CSV file' });
       });
   };
@@ -147,7 +159,7 @@ app.post('/upload', upload.single('file'), (req, res) => {
 });
 
 // Static file serving for downloads
-app.use('/download', express.static(path.join(__dirname, 'uploads')));
+app.use('/download', express.static(uploadsDir));
 
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
