@@ -60,13 +60,6 @@ const verifyEmail = async (email) => {
 };
 
 app.post('/upload', upload.single('file'), (req, res) => {
-<<<<<<< HEAD
-=======
-  if (!req.file) {
-    return res.status(400).json({ error: 'No file uploaded' });
-  }
-  
->>>>>>> 25b90aa (final commit)
   const validResults = [];
   const invalidResults = [];
   const catchAllResults = [];
@@ -153,10 +146,6 @@ app.post('/upload', upload.single('file'), (req, res) => {
   processCsv();
 });
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 25b90aa (final commit)
 // Static file serving for downloads
 app.use('/download', express.static(path.join(__dirname, 'uploads')));
 
